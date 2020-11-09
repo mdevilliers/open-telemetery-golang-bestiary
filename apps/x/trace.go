@@ -14,7 +14,7 @@ import (
 // TODO : urrgh get rig of package level function
 func IntialiseTracing(name string, labels ...label.KeyValue) error {
 	exporter, err := jaeger.NewRawExporter(
-		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"),
+		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"), // NOTE this is the URL of the open-telemetary agent
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: name,
 			Tags:        labels,

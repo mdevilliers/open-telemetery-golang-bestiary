@@ -30,5 +30,9 @@ Launch Jaeger
 
 http://0.0.0.0:16686/ 
 
+Launch Zipkin
+
+http://0.0.0.0:9411/zipkin
+
 Find your trace.
 

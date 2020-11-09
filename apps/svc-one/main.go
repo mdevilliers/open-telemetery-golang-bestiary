@@ -15,10 +15,8 @@ import (
 
 func main() {
 	// listens on GRPC :9777
-	// calls prostgres database
 
 	// initialise tracing with some shared code
-	// TODO: add ability to set service level metadata e.g. version, build hash etc
 	x.IntialiseTracing("service-one", label.String("version", "3.4"))
 
 	lis, err := net.Listen("tcp", ":9777")
@@ -26,6 +24,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	// wrap the GRPC server with the open telemetery handlers
 	s := grpc.NewServer(
 		grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
 		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()),

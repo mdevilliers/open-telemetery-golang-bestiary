@@ -4,30 +4,30 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	"go.opentelemetry.io/otel/label"
-	"go.opentelemetry.io/otel/propagators"
-	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // TODO : urrgh get rig of package level function
-func IntialiseTracing(name string, labels ...label.KeyValue) error {
-	exporter, err := jaeger.NewRawExporter(
+func IntialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
+	f, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"), // NOTE this is the URL of the open-telemetary agent
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: name,
 			Tags:        labels,
 		}),
+		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
+
 	if err != nil {
-		return fmt.Errorf("failed to create exporter: %v", err)
+		return func() {}, fmt.Errorf("failed to create exporter: %v", err)
 	}
-	tp := trace.NewTracerProvider(
-		trace.WithConfig(trace.Config{DefaultSampler: trace.AlwaysSample()}),
-		trace.WithSyncer(exporter),
-	)
-	global.SetTracerProvider(tp)
-	global.SetTextMapPropagator(otel.NewCompositeTextMapPropagator(propagators.TraceContext{}, propagators.Baggage{}))
-	return nil
+
+	tc := propagation.TraceContext{}
+	otel.SetTextMapPropagator(tc)
+
+	return f, err
+
 }

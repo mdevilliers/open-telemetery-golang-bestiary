@@ -58,3 +58,12 @@ services:
     ports:
       - "9090:9090"
     user: root
+  postgres:
+    image: 'postgres:latest'
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_DB=otsql_db
+      - POSTGRES_USER=otsql_user
+      - POSTGRES_PASSWORD=otsql_password
+

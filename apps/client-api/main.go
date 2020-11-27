@@ -21,9 +21,11 @@ func main() {
 	// calls svc-one via grpc
 
 	// initialise tracing with some shared code
-	if err := x.IntialiseTracing("client-api", label.String("version", "1.1")); err != nil {
-		log.Fatal("error initilising tracing : %v:", err)
+	flush, err := x.IntialiseTracing("client-api", label.String("version", "1.1"))
+	if err != nil {
+		log.Fatalf("error initilising tracing : %v:", err)
 	}
+	defer flush()
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
 	conn, err := grpc.Dial(":9777", grpc.WithInsecure(),

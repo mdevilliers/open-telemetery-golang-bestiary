@@ -22,7 +22,7 @@ cd apps/client-api
 go build && ./client-api
 ```
 
-Hit the web page hosted by the client API
+Hit the http endpoint hosted by the client API
 
 http://0.0.0.0:8777/hello
 

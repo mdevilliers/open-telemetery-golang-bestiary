@@ -10,7 +10,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// TODO : urrgh get rig of package level function
+// TODO : urrgh get rid of package level function
 func IntialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
 	f, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"), // NOTE this is the URL of the open-telemetary agent

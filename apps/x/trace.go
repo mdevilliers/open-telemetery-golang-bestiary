@@ -44,20 +44,23 @@ func IntialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
 
 const (
 	correlationIDHeader = "correlationIDHeader"
+
+	correlationLabel = "correlation-id"
+	traceLabel       = "trace-id"
 )
 
-// GetRequestContext returns a logger and context  populated with the current
+// GetRequestContext returns a logger and context populated with the current
 // correlation and trace ids.
 func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
+
 	cid := ctx.Value(correlationIDHeader)
 	span := trace.SpanFromContext(ctx)
 	c, ok := cid.(string)
 
 	if !ok {
-
 		// look in baggage
 		if span.IsRecording() {
-			cid := baggage.Value(ctx, label.Key("x.correlation-id"))
+			cid := baggage.Value(ctx, label.Key(correlationLabel))
 			if cid.Type() != label.INVALID {
 				c = cid.AsString()
 			}
@@ -72,15 +75,16 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	ctx = context.WithValue(ctx, correlationIDHeader, c)
 
 	// save to baggage and current trace
-	cidLabel := label.String("x.correlation-id", c)
+	cidLabel := label.String(correlationLabel, c)
 	ctx = baggage.ContextWithValues(ctx, cidLabel)
 	span.SetAttributes(cidLabel)
 
 	// create logger with trace and correlation id
 	fields := map[string]interface{}{
-		"trace-id":       span.SpanContext().TraceID,
-		"correlation-id": c,
+		traceLabel:       span.SpanContext().TraceID,
+		correlationLabel: c,
 	}
+	// TODO : create a logger properly
 	lgr := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
 
 	return lgr, ctx

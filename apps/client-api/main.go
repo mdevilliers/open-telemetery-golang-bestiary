@@ -44,7 +44,7 @@ func main() {
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
 
 		lgr, ctx := x.GetRequestContext(req.Context())
-		lgr.Info().Msg("SayHello - HTTP")
+		lgr.Info().Msg("SayHello")
 
 		span := trace.SpanFromContext(ctx)
 		span.SetAttributes(label.String("span.attribute.foo", "span-attribute-bar"))
@@ -59,7 +59,7 @@ func main() {
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		response, err := client.SayHello(ctx, &api.HelloRequest{Greeting: "World"})
 		if err != nil {
-			log.Fatalf("error when calling SayHello: %s", err)
+			lgr.Fatal().Err(err).Msg("error when calling SayHello")
 		}
 		_, _ = io.WriteString(w, fmt.Sprintf("%s\n", response))
 	}

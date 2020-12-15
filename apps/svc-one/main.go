@@ -67,7 +67,7 @@ func (s *server) SayHello(ctx context.Context, in *api.HelloRequest) (*api.Hello
 	time.Sleep(25 * time.Millisecond)
 
 	lgr, ctx := x.GetRequestContext(ctx)
-	lgr.Info().Msg("SayHello - GRPC")
+	lgr.Info().Msg("SayHello")
 
 	rows, err := s.db.QueryContext(ctx, `SELECT NOW()`)
 	if err != nil {

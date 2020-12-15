@@ -43,8 +43,8 @@ func main() {
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
 
-		cid, ctx := x.CorrelationIDFromContext(req.Context())
-		log.Println("correlation id", cid)
+		lgr, ctx := x.GetRequestContext(req.Context())
+		lgr.Info().Msg("SayHello - HTTP")
 
 		span := trace.SpanFromContext(ctx)
 		span.SetAttributes(label.String("span.attribute.foo", "span-attribute-bar"))

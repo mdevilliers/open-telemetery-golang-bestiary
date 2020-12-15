@@ -3,8 +3,10 @@ package x
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
@@ -44,7 +46,9 @@ const (
 	correlationIDHeader = "correlationIDHeader"
 )
 
-func CorrelationIDFromContext(ctx context.Context) (string, context.Context) {
+// GetRequestContext returns a logger and context  populated with the current
+// correlation and trace ids.
+func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	cid := ctx.Value(correlationIDHeader)
 	span := trace.SpanFromContext(ctx)
 	c, ok := cid.(string)
@@ -54,7 +58,9 @@ func CorrelationIDFromContext(ctx context.Context) (string, context.Context) {
 		// look in baggage
 		if span.IsRecording() {
 			cid := baggage.Value(ctx, label.Key("x.correlation-id"))
-			c = cid.AsString()
+			if cid.Type() != label.INVALID {
+				c = cid.AsString()
+			}
 		}
 		// if still empty - make one
 		if c == "" {
@@ -69,5 +75,13 @@ func CorrelationIDFromContext(ctx context.Context) (string, context.Context) {
 	cidLabel := label.String("x.correlation-id", c)
 	ctx = baggage.ContextWithValues(ctx, cidLabel)
 	span.SetAttributes(cidLabel)
-	return c, ctx
+
+	// create logger with trace and correlation id
+	fields := map[string]interface{}{
+		"trace-id":       span.SpanContext().TraceID,
+		"correlation-id": c,
+	}
+	lgr := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
+
+	return lgr, ctx
 }

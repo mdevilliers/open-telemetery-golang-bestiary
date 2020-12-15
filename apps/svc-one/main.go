@@ -13,7 +13,6 @@ import (
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/label"
-	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
 
@@ -67,13 +66,8 @@ type server struct {
 func (s *server) SayHello(ctx context.Context, in *api.HelloRequest) (*api.HelloResponse, error) {
 	time.Sleep(25 * time.Millisecond)
 
-	cid, ctx := x.CorrelationIDFromContext(ctx)
-	log.Println("correlation id", cid)
-
-	span := trace.SpanFromContext(ctx)
-	if span.IsRecording() {
-		log.Print("current trace id :", span.SpanContext().TraceID)
-	}
+	lgr, ctx := x.GetRequestContext(ctx)
+	lgr.Info().Msg("SayHello - GRPC")
 
 	rows, err := s.db.QueryContext(ctx, `SELECT NOW()`)
 	if err != nil {

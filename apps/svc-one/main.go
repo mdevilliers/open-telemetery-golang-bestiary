@@ -67,9 +67,12 @@ type server struct {
 func (s *server) SayHello(ctx context.Context, in *api.HelloRequest) (*api.HelloResponse, error) {
 	time.Sleep(25 * time.Millisecond)
 
-	span := trace.SpanContextFromContext(ctx)
-	if span.HasTraceID() {
-		log.Print("current trace id :", span.TraceID)
+	cid, ctx := x.CorrelationIDFromContext(ctx)
+	log.Println("correlation id", cid)
+
+	span := trace.SpanFromContext(ctx)
+	if span.IsRecording() {
+		log.Print("current trace id :", span.SpanContext().TraceID)
 	}
 
 	rows, err := s.db.QueryContext(ctx, `SELECT NOW()`)

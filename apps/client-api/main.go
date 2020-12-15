@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -42,6 +43,12 @@ func main() {
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
 
+		cid, ctx := x.CorrelationIDFromContext(req.Context())
+		log.Println("correlation id", cid)
+
+		span := trace.SpanFromContext(ctx)
+		span.SetAttributes(label.String("span.attribute.foo", "span-attribute-bar"))
+
 		md := metadata.Pairs(
 			"timestamp", time.Now().Format(time.StampNano),
 			"client-id", "web-api-client-us-east-1",
@@ -49,7 +56,7 @@ func main() {
 		)
 
 		// NOTE : we pass on the original context
-		ctx := metadata.NewOutgoingContext(req.Context(), md)
+		ctx = metadata.NewOutgoingContext(ctx, md)
 		response, err := client.SayHello(ctx, &api.HelloRequest{Greeting: "World"})
 		if err != nil {
 			log.Fatalf("error when calling SayHello: %s", err)

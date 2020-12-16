@@ -17,7 +17,7 @@ import (
 )
 
 // TODO : urrgh get rid of package level function
-func IntialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
+func InitialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
 	f, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"), // NOTE this is the URL of the open-telemetary agent
 		jaeger.WithProcess(jaeger.Process{
@@ -45,8 +45,8 @@ func IntialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
 const (
 	correlationIDHeader = "correlationIDHeader"
 
-	correlationLabel = "correlation-id"
-	traceLabel       = "trace-id"
+	correlationLabel = "correlationId"
+	traceLabel       = "traceId"
 )
 
 // GetRequestContext returns a logger and context populated with the current

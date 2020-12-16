@@ -21,7 +21,7 @@ func main() {
 	// querys a postgres database
 
 	// initialise tracing with some shared code
-	flush, err := x.IntialiseTracing("service-one", label.String("version", "3.4"))
+	flush, err := x.InitialiseTracing("service-one", label.String("version", "3.4"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}

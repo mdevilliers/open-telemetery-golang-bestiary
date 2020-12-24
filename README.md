@@ -1,8 +1,8 @@
 
-Start up the environment
+Start up an environment using docker-compose
 
 ```shell
-cd infra/
+cd infra/dc/
 docker-compose up
 ```
 

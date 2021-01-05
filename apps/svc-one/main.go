@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net"
 	"time"
 
 	"github.com/j2gg0s/otsql"
+	"github.com/kelseyhightower/envconfig"
 	pq "github.com/lib/pq"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
@@ -16,19 +18,33 @@ import (
 	"google.golang.org/grpc"
 )
 
+type Env struct {
+	JaegerEndpoint string `envconfig:"JAEGER_ENDPOINT" default:"http://0.0.0.0:14268/api/traces"`
+	DBHost         string `envconfig:"DB_HOST" default:"0.0.0.0"`
+	DBName         string `envconfig:"DB_NAME" default:"otsql_db"`
+	DBUserName     string `envconfig:"DB_USERNAME" default:"otsql_user"`
+	DBPassword     string `envconfig:"DB_PASSWORD" default:"otsql_password"`
+}
+
+var config Env
+
 func main() {
 	// listens on GRPC :9777
 	// querys a postgres database
 
+	if err := envconfig.Process("", &config); err != nil {
+		log.Fatalf("error initilising config : %v:", err)
+	}
+
 	// initialise tracing with some shared code
-	flush, err := x.InitialiseTracing("service-one", label.String("version", "3.4"))
+	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "service-one", label.String("version", "3.4"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
 	defer flush()
 
 	// create a db connection
-	var dsn = "postgres://otsql_user:otsql_password@localhost:5432/otsql_db?sslmode=disable"
+	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)
 
 	// create and wrap a DB connection
 	connector, err := pq.NewConnector(dsn)

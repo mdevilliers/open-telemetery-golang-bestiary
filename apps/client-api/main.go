@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -17,12 +18,22 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type Env struct {
+	JaegerEndpoint string `envconfig:"JAEGER_ENDPOINT" default:"http://0.0.0.0:14268/api/traces"`
+	SvcOneHost     string `envconfig:"SVC_HOST" default:"0.0.0.0"`
+}
+
+var config Env
+
 func main() {
 	// listens on http :8777
 	// calls svc-one via grpc
+	if err := envconfig.Process("", &config); err != nil {
+		log.Fatalf("error initilising config : %v:", err)
+	}
 
 	// intialise tracing with some shared code
-	flush, err := x.InitialiseTracing("client-api", label.String("version", "1.1"))
+	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "client-api", label.String("version", "1.1"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
@@ -35,7 +46,7 @@ func main() {
 	}
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
-	conn, err := grpc.Dial(":9777", grpc.WithInsecure(),
+	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost), grpc.WithInsecure(),
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	)

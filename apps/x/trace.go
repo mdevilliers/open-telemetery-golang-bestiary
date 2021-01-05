@@ -17,9 +17,9 @@ import (
 )
 
 // TODO : urrgh get rid of package level function
-func InitialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
+func InitialiseTracing(endpoint, name string, labels ...label.KeyValue) (func(), error) {
 	f, err := jaeger.InstallNewPipeline(
-		jaeger.WithCollectorEndpoint("http://0.0.0.0:14268/api/traces"), // NOTE this is the URL of the open-telemetary agent
+		jaeger.WithCollectorEndpoint(endpoint),
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: name,
 			Tags:        labels,
@@ -45,8 +45,8 @@ func InitialiseTracing(name string, labels ...label.KeyValue) (func(), error) {
 const (
 	correlationIDHeader = "correlationIDHeader"
 
-	correlationLabel = "correlationId"
-	traceLabel       = "traceId"
+	correlationLabel = "correlationID"
+	traceLabel       = "traceID"
 )
 
 // GetRequestContext returns a logger and context populated with the current
@@ -85,7 +85,6 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 		correlationLabel: c,
 	}
 	// TODO : create a logger properly
-	lgr := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
-
+	lgr := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true}).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
 	return lgr, ctx
 }

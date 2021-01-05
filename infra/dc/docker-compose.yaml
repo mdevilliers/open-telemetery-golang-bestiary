@@ -58,6 +58,7 @@ services:
     ports:
       - "9090:9090"
     user: root
+
   postgres:
     image: 'postgres:latest'
     ports:

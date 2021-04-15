@@ -8,23 +8,28 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
-	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/semconv"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // TODO : urrgh get rid of package level function
-func InitialiseTracing(endpoint, name string, labels ...label.KeyValue) (func(), error) {
+func InitialiseTracing(endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
+
+	resources := resource.NewWithAttributes(
+		semconv.ServiceNameKey.String(name),
+	)
+
 	f, err := jaeger.InstallNewPipeline(
 		jaeger.WithCollectorEndpoint(endpoint),
-		jaeger.WithProcess(jaeger.Process{
-			ServiceName: name,
-			Tags:        labels,
-		}),
-		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
+		jaeger.WithSDKOptions(
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+			sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(labels...)))),
 	)
 
 	if err != nil {
@@ -60,8 +65,8 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	if !ok {
 		// look in baggage
 		if span.IsRecording() {
-			cid := baggage.Value(ctx, label.Key(correlationLabel))
-			if cid.Type() != label.INVALID {
+			cid := baggage.Value(ctx, attribute.Key(correlationLabel))
+			if cid.Type() != attribute.INVALID {
 				c = cid.AsString()
 			}
 		}
@@ -75,16 +80,17 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	ctx = context.WithValue(ctx, correlationIDHeader, c)
 
 	// save to baggage and current trace
-	cidLabel := label.String(correlationLabel, c)
+	cidLabel := attribute.String(correlationLabel, c)
 	ctx = baggage.ContextWithValues(ctx, cidLabel)
 	span.SetAttributes(cidLabel)
 
 	// create logger with trace and correlation id
 	fields := map[string]interface{}{
-		traceLabel:       span.SpanContext().TraceID,
+		traceLabel:       span.SpanContext().TraceID(),
 		correlationLabel: c,
 	}
 	// TODO : create a logger properly
 	lgr := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true}).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
 	return lgr, ctx
+
 }

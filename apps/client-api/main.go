@@ -12,7 +12,7 @@ import (
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// intialise tracing with some shared code
-	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "client-api", label.String("version", "1.1"))
+	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "client-api", attribute.String("version", "1.1"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
@@ -64,7 +64,7 @@ func main() {
 		lgr.Info().Msg("SayHello")
 
 		span := trace.SpanFromContext(ctx)
-		span.SetAttributes(label.String("span.attribute.foo", "span-attribute-bar"))
+		span.SetAttributes(attribute.String("span.attribute.foo", "span-attribute-bar"))
 
 		md := metadata.Pairs(
 			"timestamp", time.Now().Format(time.StampNano),

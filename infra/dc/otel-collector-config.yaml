@@ -1,5 +1,7 @@
 receivers:
-  opencensus:
+  otlp:
+    protocols:
+      grpc:
 
 exporters:
   prometheus:
@@ -25,7 +27,6 @@ exporters:
 
 processors:
   batch:
-  queued_retry:
 
 extensions:
   health_check:
@@ -38,10 +39,10 @@ service:
   extensions: [pprof, zpages, health_check]
   pipelines:
     traces:
-      receivers: [opencensus]
-      processors: [batch, queued_retry]
+      receivers: [otlp]
+      processors: [batch]
       exporters: [logging, zipkin, jaeger]
     metrics:
-      receivers: [opencensus]
+      receivers: [otlp]
       processors: [batch]
       exporters: [logging,prometheus]

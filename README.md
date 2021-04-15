@@ -26,9 +26,9 @@ Hit the http endpoint hosted by the client API
 
 http://0.0.0.0:8777/hello
 
-Launch Jaeger 
+Launch Jaeger
 
-http://0.0.0.0:16686/ 
+http://0.0.0.0:16686/
 
 Launch Zipkin
 

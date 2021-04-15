@@ -8,13 +8,14 @@ import (
 	"net"
 	"time"
 
-	"github.com/j2gg0s/otsql"
+	"github.com/XSAM/otelsql"
 	"github.com/kelseyhightower/envconfig"
-	pq "github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/semconv"
 	"google.golang.org/grpc"
 )
 
@@ -37,7 +38,7 @@ func main() {
 	}
 
 	// initialise tracing with some shared code
-	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "service-one", label.String("version", "3.4"))
+	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "service-one", attribute.String("version", "3.4"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
@@ -46,13 +47,16 @@ func main() {
 	// create a db connection
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)
 
-	// create and wrap a DB connection
-	connector, err := pq.NewConnector(dsn)
+	// Register an OTel driver
+	driverName, err := otelsql.Register("postgres", semconv.DBSystemPostgres.Value.AsString())
 	if err != nil {
-		log.Fatalf("unable to connect to database: %v", err)
+		panic(err)
 	}
-	db := sql.OpenDB(
-		otsql.WrapConnector(connector, otsql.WithQuery(true)))
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		panic(err)
+	}
+
 	defer db.Close()
 
 	lis, err := net.Listen("tcp", ":9777")

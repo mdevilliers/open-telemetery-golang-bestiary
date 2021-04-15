@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -12,7 +13,11 @@ import (
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/propagation"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
@@ -21,7 +26,7 @@ import (
 )
 
 // TODO : urrgh get rid of package level function
-func InitialiseTracing(ctx context.Context, endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
+func InitialiseOTLP(ctx context.Context, endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
 
 	resources := resource.NewWithAttributes(
 		semconv.ServiceNameKey.String(name),
@@ -46,11 +51,22 @@ func InitialiseTracing(ctx context.Context, endpoint, name string, labels ...att
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
+
+	metricController := controller.New(
+		processor.New(
+			simple.NewWithExactDistribution(),
+			exporter,
+		),
+		controller.WithCollectPeriod(10*time.Second),
+		controller.WithExporter(exporter),
+	)
+
 	otel.SetTracerProvider(tracerProvider)
 	otel.SetTextMapPropagator(propagators)
-
+	global.SetMeterProvider(metricController.MeterProvider())
 	return func() {
 		tracerProvider.Shutdown(ctx)
+		metricController.Stop(context.Background())
 		exporter.Shutdown(ctx)
 	}, err
 

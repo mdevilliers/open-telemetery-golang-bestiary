@@ -20,11 +20,11 @@ import (
 )
 
 type Env struct {
-	JaegerEndpoint string `envconfig:"JAEGER_ENDPOINT" default:"http://0.0.0.0:14268/api/traces"`
-	DBHost         string `envconfig:"DB_HOST" default:"0.0.0.0"`
-	DBName         string `envconfig:"DB_NAME" default:"otsql_db"`
-	DBUserName     string `envconfig:"DB_USERNAME" default:"otsql_user"`
-	DBPassword     string `envconfig:"DB_PASSWORD" default:"otsql_password"`
+	OTLPEndpoint string `envconfig:"OTLP_ENDPOINT" default:"0.0.0.0:4317"`
+	DBHost       string `envconfig:"DB_HOST" default:"0.0.0.0"`
+	DBName       string `envconfig:"DB_NAME" default:"otsql_db"`
+	DBUserName   string `envconfig:"DB_USERNAME" default:"otsql_user"`
+	DBPassword   string `envconfig:"DB_PASSWORD" default:"otsql_password"`
 }
 
 var config Env
@@ -38,7 +38,8 @@ func main() {
 	}
 
 	// initialise tracing with some shared code
-	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "service-one", attribute.String("version", "3.4"))
+	ctx := context.Background()
+	flush, err := x.InitialiseTracing(ctx, config.OTLPEndpoint, "service-one", attribute.String("version", "3.4"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
@@ -50,11 +51,11 @@ func main() {
 	// Register an OTel driver
 	driverName, err := otelsql.Register("postgres", semconv.DBSystemPostgres.Value.AsString())
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to register DB driver : %v", err)
 	}
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to open DB connection: %v", err)
 	}
 
 	defer db.Close()
@@ -71,6 +72,7 @@ func main() {
 	)
 
 	api.RegisterHelloServiceServer(s, &server{db: db})
+	log.Println("service started!")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

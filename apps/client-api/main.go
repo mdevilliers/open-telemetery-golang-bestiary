@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -19,8 +20,8 @@ import (
 )
 
 type Env struct {
-	JaegerEndpoint string `envconfig:"JAEGER_ENDPOINT" default:"http://0.0.0.0:14268/api/traces"`
-	SvcOneHost     string `envconfig:"SVC_HOST" default:"0.0.0.0"`
+	OTLPEndpoint string `envconfig:"OTLP_ENDPOINT" default:"0.0.0.0:4317"`
+	SvcOneHost   string `envconfig:"SVC_HOST" default:"0.0.0.0"`
 }
 
 var config Env
@@ -33,7 +34,8 @@ func main() {
 	}
 
 	// intialise tracing with some shared code
-	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "client-api", attribute.String("version", "1.1"))
+	ctx := context.Background()
+	flush, err := x.InitialiseTracing(ctx, config.OTLPEndpoint, "client-api", attribute.String("version", "1.1"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
@@ -85,6 +87,7 @@ func main() {
 	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello")
 
 	http.Handle("/hello", otelHandler)
+	log.Println("service started!")
 	if err = http.ListenAndServe(":8777", nil); err != nil {
 		panic(err)
 	}

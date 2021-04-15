@@ -1,11 +1,7 @@
 receivers:
-  opencensus:
-  jaeger:
+  otlp:
     protocols:
       grpc:
-      thrift_http:
-      thrift_compact:
-      thrift_binary:
 
 exporters:
   logging:
@@ -28,10 +24,10 @@ service:
   extensions: [health_check, pprof, zpages]
   pipelines:
     traces:
-      receivers: [jaeger]
+      receivers: [otlp]
       processors: [batch]
       exporters: [otlp, logging]
     metrics:
-      receivers: [opencensus]
+      receivers: [otlp]
       processors: [batch]
       exporters: [otlp, logging]

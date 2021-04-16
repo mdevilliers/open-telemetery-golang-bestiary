@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.78.0 // indirect
 	github.com/XSAM/otelsql v0.2.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.8.0

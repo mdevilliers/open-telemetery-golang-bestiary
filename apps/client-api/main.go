@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -13,14 +14,16 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
 type Env struct {
-	JaegerEndpoint string `envconfig:"JAEGER_ENDPOINT" default:"http://0.0.0.0:14268/api/traces"`
-	SvcOneHost     string `envconfig:"SVC_HOST" default:"0.0.0.0"`
+	OTLPEndpoint string `envconfig:"OTLP_ENDPOINT" default:"0.0.0.0:4317"`
+	SvcOneHost   string `envconfig:"SVC_HOST" default:"0.0.0.0"`
 }
 
 var config Env
@@ -33,17 +36,12 @@ func main() {
 	}
 
 	// intialise tracing with some shared code
-	flush, err := x.InitialiseTracing(config.JaegerEndpoint, "client-api", attribute.String("version", "1.1"))
+	ctx := context.Background()
+	flush, err := x.InitialiseOTLP(ctx, config.OTLPEndpoint, "client-api", attribute.String("version", "1.1"))
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
 	defer flush()
-
-	// initilise some metrics
-	err = x.IntialiseMetrics()
-	if err != nil {
-		log.Fatalf("error initilising metrics : %v:", err)
-	}
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
 	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost), grpc.WithInsecure(),
@@ -57,9 +55,22 @@ func main() {
 	defer func() { _ = conn.Close() }()
 
 	client := api.NewHelloServiceClient(conn)
+	meter := global.Meter("client-api-meter")
+
+	commonLabels := []attribute.KeyValue{
+		attribute.String("service", "client-api"),
+	}
+
+	// Recorder metric example
+	requestLatency := metric.Must(meter).
+		NewFloat64ValueRecorder(
+			"client-api/request_latency",
+			metric.WithDescription("The latency of requests processed"),
+		).Bind(commonLabels...)
+	defer requestLatency.Unbind()
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
-
+		startTime := time.Now()
 		lgr, ctx := x.GetRequestContext(req.Context())
 		lgr.Info().Msg("SayHello")
 
@@ -79,12 +90,17 @@ func main() {
 			lgr.Fatal().Err(err).Msg("error when calling SayHello")
 		}
 		_, _ = io.WriteString(w, fmt.Sprintf("%s\n", response))
+
+		span.End()
+		latencyMs := float64(time.Since(startTime)) / 1e6
+		requestLatency.Record(ctx, latencyMs)
 	}
 
 	// wrap http handler with generic tracer
 	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello")
 
 	http.Handle("/hello", otelHandler)
+	log.Println("service started!")
 	if err = http.ListenAndServe(":8777", nil); err != nil {
 		panic(err)
 	}

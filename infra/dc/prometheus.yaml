@@ -4,4 +4,3 @@ scrape_configs:
     static_configs:
       - targets: ['otel-collector:8888']
       - targets: ['otel-collector:8889']
-      - targets: ['otel-agent:8887']

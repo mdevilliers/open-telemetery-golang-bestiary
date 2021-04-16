@@ -4,46 +4,71 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
-	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/propagation"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
 )
 
 // TODO : urrgh get rid of package level function
-func InitialiseTracing(endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
+func InitialiseOTLP(ctx context.Context, endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
 
 	resources := resource.NewWithAttributes(
 		semconv.ServiceNameKey.String(name),
 	)
-
-	f, err := jaeger.InstallNewPipeline(
-		jaeger.WithCollectorEndpoint(endpoint),
-		jaeger.WithSDKOptions(
-			sdktrace.WithSampler(sdktrace.AlwaysSample()),
-			sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(labels...)))),
-	)
+	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
+		otlpgrpc.WithInsecure(),
+		otlpgrpc.WithEndpoint(endpoint),
+		otlpgrpc.WithDialOption(grpc.WithBlock()), // useful for testing
+	))
 
 	if err != nil {
 		return func() {}, fmt.Errorf("failed to create exporter: %v", err)
 	}
 
+	bsp := sdktrace.NewBatchSpanProcessor(exporter)
+	tracerProvider := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(labels...))),
+		sdktrace.WithSpanProcessor(bsp),
+	)
 	propagators := propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	)
 
-	otel.SetTextMapPropagator(propagators)
+	metricController := controller.New(
+		processor.New(
+			simple.NewWithExactDistribution(),
+			exporter,
+		),
+		controller.WithCollectPeriod(10*time.Second),
+		controller.WithExporter(exporter),
+	)
 
-	return f, err
+	otel.SetTracerProvider(tracerProvider)
+	otel.SetTextMapPropagator(propagators)
+	global.SetMeterProvider(metricController.MeterProvider())
+	return func() {
+		tracerProvider.Shutdown(ctx)
+		metricController.Stop(context.Background())
+		exporter.Shutdown(ctx)
+	}, err
 
 }
 
@@ -74,7 +99,6 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 		if c == "" {
 			c = uuid.New().String()
 		}
-
 	}
 
 	ctx = context.WithValue(ctx, correlationIDHeader, c)

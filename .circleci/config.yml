@@ -6,7 +6,7 @@ jobs:
     steps:
       - checkout
       - run: cd apps/svc-one && go build
-      - run: cd ../client-api && go build
+      - run: cd apps/client-api && go build
 
 workflows:
   version: 2

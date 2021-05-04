@@ -39,7 +39,12 @@ func main() {
 
 	// initialise tracing with some shared code
 	ctx := context.Background()
-	flush, err := x.InitialiseOTLP(ctx, config.OTLPEndpoint, "service-one", attribute.String("version", "3.4"))
+	flush, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
+		Endpoint: config.OTLPEndpoint,
+		Name:     "service-one",
+		Labels:   []attribute.KeyValue{attribute.String("version", "3.4")},
+	})
+
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}

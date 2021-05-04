@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
@@ -25,15 +26,21 @@ import (
 	"google.golang.org/grpc"
 )
 
+type OTLPConfig struct {
+	Name     string
+	Endpoint string
+	Labels   []attribute.KeyValue
+}
+
 // TODO : urrgh get rid of package level function
-func InitialiseOTLP(ctx context.Context, endpoint, name string, labels ...attribute.KeyValue) (func(), error) {
+func InitialiseOTLP(ctx context.Context, config OTLPConfig) (func(), error) {
 
 	resources := resource.NewWithAttributes(
-		semconv.ServiceNameKey.String(name),
+		semconv.ServiceNameKey.String(config.Name),
 	)
 	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
 		otlpgrpc.WithInsecure(),
-		otlpgrpc.WithEndpoint(endpoint),
+		otlpgrpc.WithEndpoint(config.Endpoint),
 		otlpgrpc.WithDialOption(grpc.WithBlock()), // useful for testing
 	))
 
@@ -44,7 +51,7 @@ func InitialiseOTLP(ctx context.Context, endpoint, name string, labels ...attrib
 	bsp := sdktrace.NewBatchSpanProcessor(exporter)
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(labels...))),
+		sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(config.Labels...))),
 		sdktrace.WithSpanProcessor(bsp),
 	)
 	propagators := propagation.NewCompositeTextMapPropagator(
@@ -54,12 +61,21 @@ func InitialiseOTLP(ctx context.Context, endpoint, name string, labels ...attrib
 
 	metricController := controller.New(
 		processor.New(
-			simple.NewWithExactDistribution(),
-			exporter,
+			simple.NewWithExactDistribution(), exporter,
 		),
-		controller.WithCollectPeriod(10*time.Second),
+		controller.WithCollectPeriod(2*time.Second),
 		controller.WithExporter(exporter),
 	)
+	err = host.Start()
+	if err != nil {
+		return func() {}, fmt.Errorf("failed to start host instrumentation: %v", err)
+	}
+
+	err = metricController.Start(ctx)
+
+	if err != nil {
+		return func() {}, fmt.Errorf("failed to start metric controller: %v", err)
+	}
 
 	otel.SetTracerProvider(tracerProvider)
 	otel.SetTextMapPropagator(propagators)

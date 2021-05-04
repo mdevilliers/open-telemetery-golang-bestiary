@@ -37,15 +37,19 @@ func main() {
 
 	// intialise tracing with some shared code
 	ctx := context.Background()
-	flush, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
+	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
 		Name:     "client-api",
 		Labels:   []attribute.KeyValue{attribute.String("version", "1.1")},
+		Metrics: x.Metrics{
+			Type: x.Push,
+		},
 	})
+
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
-	defer flush()
+	defer otlp.Dispose(ctx)
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
 	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost), grpc.WithInsecure(),

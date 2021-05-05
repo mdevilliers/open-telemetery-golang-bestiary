@@ -8,3 +8,7 @@ scrape_configs:
     scrape_interval: 10s
     static_configs:
       - targets: ['host.docker.internal:2222']
+  - job_name: 'client-api-scraper'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:2223']

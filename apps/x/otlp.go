@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/metric/prometheus"
+	"go.opentelemetry.io/otel/metric"
 
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
@@ -50,8 +51,9 @@ type Metrics struct {
 }
 
 type instance struct {
-	disposables []func(context.Context) error
-	resources   *resource.Resource
+	disposables   []func(context.Context) error
+	resources     *resource.Resource
+	meterProvider metric.MeterProvider
 }
 
 func (i *instance) Close(ctx context.Context) error {
@@ -65,6 +67,10 @@ func (i *instance) Close(ctx context.Context) error {
 
 func (i *instance) Resources() *resource.Resource {
 	return i.resources
+}
+
+func (i *instance) MeterProvider() metric.MeterProvider {
+	return i.meterProvider
 }
 
 func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
@@ -126,6 +132,8 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 		}
 
 		global.SetMeterProvider(metricController.MeterProvider())
+		ret.meterProvider = metricController.MeterProvider()
+
 		ret.disposables = append(ret.disposables, func(ctx context.Context) error { return metricController.Stop(ctx) })
 	}
 	if config.Metrics.Type == Pull {
@@ -141,6 +149,8 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 		go func() {
 			_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
 		}()
+		global.SetMeterProvider(exporter.MeterProvider())
+		ret.meterProvider = exporter.MeterProvider()
 	}
 	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
 		return exporter.Shutdown(ctx)

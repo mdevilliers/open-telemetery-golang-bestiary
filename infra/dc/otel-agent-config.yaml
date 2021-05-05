@@ -5,7 +5,7 @@ receivers:
 
 exporters:
   logging:
-    loglevel: debug
+    loglevel: error
   otlp:
     endpoint: "otel-collector:4317"
     insecure: true

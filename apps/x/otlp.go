@@ -3,15 +3,19 @@ package x
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/google/uuid"
+	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/exporters/metric/prometheus"
+
 	"go.opentelemetry.io/otel/exporters/otlp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
 	"go.opentelemetry.io/otel/metric/global"
@@ -30,14 +34,46 @@ type OTLPConfig struct {
 	Name     string
 	Endpoint string
 	Labels   []attribute.KeyValue
+	Metrics  Metrics
+}
+type metricsType int
+
+const (
+	Push metricsType = iota
+	Pull
+)
+
+// TODO : have sensible defaults via an option interface
+type Metrics struct {
+	Type               metricsType
+	Port               int
+	Registry           *prom.Registry
+	IncludeHostMetrics bool
 }
 
-// TODO : urrgh get rid of package level function
-func InitialiseOTLP(ctx context.Context, config OTLPConfig) (func(), error) {
+type instance struct {
+	disposables []func(context.Context) error
+}
 
-	resources := resource.NewWithAttributes(
+func (i *instance) Dispose(ctx context.Context) error {
+	for d := range i.disposables {
+		if err := i.disposables[d](ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
+
+	ret := &instance{}
+
+	resources := resource.Merge(resource.Default(), resource.NewWithAttributes(
 		semconv.ServiceNameKey.String(config.Name),
-	)
+	))
+
+	resources = resource.Merge(resources, resource.NewWithAttributes(config.Labels...))
+
 	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
 		otlpgrpc.WithInsecure(),
 		otlpgrpc.WithEndpoint(config.Endpoint),
@@ -45,13 +81,13 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (func(), error) {
 	))
 
 	if err != nil {
-		return func() {}, fmt.Errorf("failed to create exporter: %v", err)
+		return ret, fmt.Errorf("failed to create exporter: %v", err)
 	}
 
 	bsp := sdktrace.NewBatchSpanProcessor(exporter)
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(config.Labels...))),
+		sdktrace.WithResource(resources),
 		sdktrace.WithSpanProcessor(bsp),
 	)
 	propagators := propagation.NewCompositeTextMapPropagator(
@@ -59,32 +95,56 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (func(), error) {
 		propagation.Baggage{},
 	)
 
-	metricController := controller.New(
-		processor.New(
-			simple.NewWithExactDistribution(), exporter,
-		),
-		controller.WithCollectPeriod(2*time.Second),
-		controller.WithExporter(exporter),
-	)
-	err = host.Start()
-	if err != nil {
-		return func() {}, fmt.Errorf("failed to start host instrumentation: %v", err)
-	}
-
-	err = metricController.Start(ctx)
-
-	if err != nil {
-		return func() {}, fmt.Errorf("failed to start metric controller: %v", err)
-	}
-
+	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
+		return tracerProvider.Shutdown(ctx)
+	})
 	otel.SetTracerProvider(tracerProvider)
 	otel.SetTextMapPropagator(propagators)
-	global.SetMeterProvider(metricController.MeterProvider())
-	return func() {
-		tracerProvider.Shutdown(ctx)
-		metricController.Stop(context.Background())
-		exporter.Shutdown(ctx)
-	}, err
+
+	if config.Metrics.IncludeHostMetrics {
+		err = host.Start()
+		if err != nil {
+			return ret, fmt.Errorf("failed to start host instrumentation: %v", err)
+		}
+	}
+	if config.Metrics.Type == Push {
+		metricController := controller.New(
+			processor.New(
+				simple.NewWithExactDistribution(), exporter,
+			),
+			controller.WithCollectPeriod(2*time.Second),
+			controller.WithExporter(exporter),
+			controller.WithResource(resources),
+		)
+
+		err = metricController.Start(ctx)
+
+		if err != nil {
+			return ret, fmt.Errorf("failed to start metric controller: %v", err)
+		}
+
+		global.SetMeterProvider(metricController.MeterProvider())
+		ret.disposables = append(ret.disposables, func(ctx context.Context) error { return metricController.Stop(ctx) })
+	}
+	if config.Metrics.Type == Pull {
+
+		exporter, err := prometheus.InstallNewPipeline(prometheus.Config{Registry: config.Metrics.Registry})
+
+		if err != nil {
+			return ret, fmt.Errorf("failed to initialize prometheus exporter %v", err)
+		}
+
+		http.HandleFunc("/", exporter.ServeHTTP)
+
+		go func() {
+			_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
+		}()
+	}
+	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
+		return exporter.Shutdown(ctx)
+	})
+
+	return ret, nil
 
 }
 

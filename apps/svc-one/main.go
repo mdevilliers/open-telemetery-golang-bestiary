@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/XSAM/otelsql"
+	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/semconv"
@@ -37,18 +39,25 @@ func main() {
 		log.Fatalf("error initilising config : %v:", err)
 	}
 
-	// initialise tracing with some shared code
+	// initialise OTLP with some shared code
 	ctx := context.Background()
-	flush, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
+	reg := prometheus.NewRegistry()
+
+	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
 		Name:     "service-one",
 		Labels:   []attribute.KeyValue{attribute.String("version", "3.4")},
+		Metrics: x.Metrics{
+			Type:     x.Pull,
+			Port:     2222,
+			Registry: reg,
+		},
 	})
 
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
-	defer flush()
+	defer otlp.Dispose(ctx)
 
 	// create a db connection
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)
@@ -70,10 +79,12 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	// wrap the GRPC server with the open telemetery handlers
+	grpcMetrics := grpc_prometheus.NewServerMetrics()
+	reg.MustRegister(grpcMetrics)
+	// wrap the GRPC server with the open telemetery and prometheus interceptors
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
-		grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(grpcMetrics.UnaryServerInterceptor(), otelgrpc.UnaryServerInterceptor()),
+		grpc.ChainStreamInterceptor(grpcMetrics.StreamServerInterceptor(), otelgrpc.StreamServerInterceptor()),
 	)
 
 	api.RegisterHelloServiceServer(s, &server{db: db})

@@ -4,3 +4,7 @@ scrape_configs:
     static_configs:
       - targets: ['otel-collector:8888']
       - targets: ['otel-collector:8889']
+  - job_name: 'svc-one-scraper'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['host.docker.internal:2222']

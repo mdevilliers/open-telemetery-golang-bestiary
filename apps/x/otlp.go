@@ -53,9 +53,10 @@ type Metrics struct {
 
 type instance struct {
 	disposables []func(context.Context) error
+	resources   *resource.Resource
 }
 
-func (i *instance) Dispose(ctx context.Context) error {
+func (i *instance) Close(ctx context.Context) error {
 	for d := range i.disposables {
 		if err := i.disposables[d](ctx); err != nil {
 			return err
@@ -64,15 +65,20 @@ func (i *instance) Dispose(ctx context.Context) error {
 	return nil
 }
 
-func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
+func (i *instance) Resources() *resource.Resource {
+	return i.resources
+}
 
-	ret := &instance{}
+func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 
 	resources := resource.Merge(resource.Default(), resource.NewWithAttributes(
 		semconv.ServiceNameKey.String(config.Name),
 	))
 
 	resources = resource.Merge(resources, resource.NewWithAttributes(config.Labels...))
+	ret := &instance{
+		resources: resources,
+	}
 
 	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
 		otlpgrpc.WithInsecure(),

@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
-	defer otlp.Dispose(ctx)
+	defer otlp.Close(ctx)
 
 	// create a db connection
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)

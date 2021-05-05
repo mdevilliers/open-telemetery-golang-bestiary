@@ -45,8 +45,9 @@ func main() {
 
 	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
-		Name:     "service-one",
-		Labels:   []attribute.KeyValue{attribute.String("version", "3.4")},
+		Labels: []attribute.KeyValue{
+			semconv.ServiceNameKey.String("service-one"),
+			semconv.ServiceVersionKey.String("3.4")},
 		Metrics: x.Metrics{
 			Type:     x.Pull,
 			Port:     2222,
@@ -57,7 +58,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
-	defer otlp.Dispose(ctx)
+	defer otlp.Close(ctx)
 
 	// create a db connection
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)

@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/semconv"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -39,8 +40,9 @@ func main() {
 	ctx := context.Background()
 	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
-		Name:     "client-api",
-		Labels:   []attribute.KeyValue{attribute.String("version", "1.1")},
+		Labels: []attribute.KeyValue{
+			semconv.ServiceNameKey.String("client-api"),
+			semconv.ServiceVersionKey.String("1.1")},
 		Metrics: x.Metrics{
 			Type: x.Push,
 		},
@@ -49,7 +51,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("error initilising tracing : %v:", err)
 	}
-	defer otlp.Dispose(ctx)
+	defer otlp.Close(ctx)
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
 	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost), grpc.WithInsecure(),
@@ -65,16 +67,12 @@ func main() {
 	client := api.NewHelloServiceClient(conn)
 	meter := global.Meter("client-api-meter")
 
-	commonLabels := []attribute.KeyValue{
-		attribute.String("service", "client-api"),
-	}
-
 	// Recorder metric example
 	requestLatency := metric.Must(meter).
 		NewFloat64ValueRecorder(
 			"client-api/request_latency",
 			metric.WithDescription("The latency of requests processed"),
-		).Bind(commonLabels...)
+		).Bind(otlp.Resources().Attributes()...)
 	defer requestLatency.Unbind()
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {

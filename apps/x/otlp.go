@@ -25,13 +25,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/semconv"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
 
 type OTLPConfig struct {
-	Name     string
 	Endpoint string
 	Labels   []attribute.KeyValue
 	Metrics  Metrics
@@ -71,11 +69,9 @@ func (i *instance) Resources() *resource.Resource {
 
 func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 
-	resources := resource.Merge(resource.Default(), resource.NewWithAttributes(
-		semconv.ServiceNameKey.String(config.Name),
-	))
+	resources := resource.Merge(resource.Default(),
+		resource.NewWithAttributes(config.Labels...))
 
-	resources = resource.Merge(resources, resource.NewWithAttributes(config.Labels...))
 	ret := &instance{
 		resources: resources,
 	}

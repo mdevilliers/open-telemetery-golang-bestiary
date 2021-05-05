@@ -45,8 +45,9 @@ func main() {
 
 	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
-		Name:     "service-one",
-		Labels:   []attribute.KeyValue{attribute.String("version", "3.4")},
+		Labels: []attribute.KeyValue{
+			semconv.ServiceNameKey.String("service-one"),
+			semconv.ServiceVersionKey.String("3.4")},
 		Metrics: x.Metrics{
 			Type:     x.Pull,
 			Port:     2222,

@@ -57,18 +57,23 @@ type instance struct {
 
 func (i *instance) Dispose(ctx context.Context) error {
 	for d := range i.disposables {
-		i.disposables[d](ctx)
+		if err := i.disposables[d](ctx); err != nil {
+			return err
+		}
 	}
-	return nil // TODO : implement errgroup
+	return nil
 }
 
 func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 
 	ret := &instance{}
 
-	resources := resource.NewWithAttributes(
+	resources := resource.Merge(resource.Default(), resource.NewWithAttributes(
 		semconv.ServiceNameKey.String(config.Name),
-	)
+	))
+
+	resources = resource.Merge(resources, resource.NewWithAttributes(config.Labels...))
+
 	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
 		otlpgrpc.WithInsecure(),
 		otlpgrpc.WithEndpoint(config.Endpoint),
@@ -82,7 +87,7 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 	bsp := sdktrace.NewBatchSpanProcessor(exporter)
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-		sdktrace.WithResource(resource.Merge(resources, resource.NewWithAttributes(config.Labels...))),
+		sdktrace.WithResource(resources),
 		sdktrace.WithSpanProcessor(bsp),
 	)
 	propagators := propagation.NewCompositeTextMapPropagator(
@@ -109,6 +114,7 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 			),
 			controller.WithCollectPeriod(2*time.Second),
 			controller.WithExporter(exporter),
+			controller.WithResource(resources),
 		)
 
 		err = metricController.Start(ctx)

@@ -14,7 +14,6 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/semconv"
@@ -41,17 +40,16 @@ func main() {
 
 	// initialise OTLP with some shared code
 	ctx := context.Background()
-	reg := prometheus.NewRegistry()
 
 	otlp, err := x.InitialiseOTLP(ctx, x.OTLPConfig{
 		Endpoint: config.OTLPEndpoint,
 		Labels: []attribute.KeyValue{
 			semconv.ServiceNameKey.String("service-one"),
-			semconv.ServiceVersionKey.String("3.4")},
+			semconv.ServiceVersionKey.String("3.4"),
+			semconv.ServiceNamespaceKey.String("demo")},
 		Metrics: x.Metrics{
-			Type:     x.Pull,
-			Port:     2222,
-			Registry: reg,
+			Type: x.Pull,
+			Port: 2222,
 		},
 	})
 
@@ -81,7 +79,8 @@ func main() {
 	}
 
 	grpcMetrics := grpc_prometheus.NewServerMetrics()
-	reg.MustRegister(grpcMetrics)
+	otlp.PrometheusRegistry().MustRegister(grpcMetrics)
+
 	// wrap the GRPC server with the open telemetery and prometheus interceptors
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(grpcMetrics.UnaryServerInterceptor(), otelgrpc.UnaryServerInterceptor()),

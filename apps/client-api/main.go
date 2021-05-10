@@ -15,7 +15,6 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/semconv"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
@@ -42,9 +41,11 @@ func main() {
 		Endpoint: config.OTLPEndpoint,
 		Labels: []attribute.KeyValue{
 			semconv.ServiceNameKey.String("client-api"),
-			semconv.ServiceVersionKey.String("1.1")},
+			semconv.ServiceVersionKey.String("1.1"),
+			semconv.ServiceNamespaceKey.String("demo")},
 		Metrics: x.Metrics{
-			Type: x.Push,
+			Type: x.Pull,
+			Port: 2223,
 		},
 	})
 
@@ -65,10 +66,9 @@ func main() {
 	defer func() { _ = conn.Close() }()
 
 	client := api.NewHelloServiceClient(conn)
-	meter := global.Meter("client-api-meter")
 
 	// Recorder metric example
-	requestLatency := metric.Must(meter).
+	requestLatency := metric.Must(otlp.MeterProvider().Meter("client-api-meter")).
 		NewFloat64ValueRecorder(
 			"client-api/request_latency",
 			metric.WithDescription("The latency of requests processed"),
@@ -81,7 +81,7 @@ func main() {
 		lgr.Info().Msg("SayHello")
 
 		span := trace.SpanFromContext(ctx)
-		span.SetAttributes(attribute.String("span.attribute.foo", "span-attribute-bar"))
+		span.SetAttributes(attribute.String("foo", "bar"))
 
 		md := metadata.Pairs(
 			"timestamp", time.Now().Format(time.StampNano),
@@ -103,7 +103,7 @@ func main() {
 	}
 
 	// wrap http handler with generic tracer
-	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello")
+	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello", otelhttp.WithMeterProvider(otlp.MeterProvider()))
 
 	http.Handle("/hello", otelHandler)
 	log.Println("service started!")

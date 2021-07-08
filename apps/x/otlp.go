@@ -3,9 +3,7 @@ package x
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 	prom "github.com/prometheus/client_golang/prometheus"
@@ -14,15 +12,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
-	"go.opentelemetry.io/otel/exporters/metric/prometheus"
-	"go.opentelemetry.io/otel/exporters/otlp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/propagation"
-	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
-	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
-	"go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -77,19 +69,23 @@ func (i *instance) PrometheusRegistry() *prom.Registry {
 
 func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 
-	resources := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(config.Labels...))
+	resources, err := resource.Merge(resource.Default(),
+		resource.NewSchemaless(config.Labels...))
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resources: %v", err)
+	}
 
 	ret := &instance{
 		resources:    resources,
 		promregistry: prom.NewRegistry(),
 	}
 
-	exporter, err := otlp.NewExporter(ctx, otlpgrpc.NewDriver(
-		otlpgrpc.WithInsecure(),
-		otlpgrpc.WithEndpoint(config.Endpoint),
-		otlpgrpc.WithDialOption(grpc.WithBlock()), // useful for testing
-	))
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpoint(config.Endpoint),
+		otlptracegrpc.WithDialOption(grpc.WithBlock()), // useful for testing
+	)
 
 	if err != nil {
 		return ret, fmt.Errorf("failed to create exporter: %v", err)
@@ -118,43 +114,45 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 			return ret, fmt.Errorf("failed to start host instrumentation: %v", err)
 		}
 	}
-	if config.Metrics.Type == Push {
-		metricController := controller.New(
-			processor.New(
-				simple.NewWithExactDistribution(), exporter,
-			),
-			controller.WithCollectPeriod(2*time.Second),
-			controller.WithExporter(exporter),
-			controller.WithResource(resources),
-		)
+	/*
+		if config.Metrics.Type == Push {
+				metricController := controller.New(
+					processor.New(
+						simple.NewWithExactDistribution(), exporter,
+					),
+					controller.WithCollectPeriod(2*time.Second),
+					controller.WithExporter(exporter),
+					controller.WithResource(resources),
+				)
 
-		err = metricController.Start(ctx)
+				err = metricController.Start(ctx)
 
-		if err != nil {
-			return ret, fmt.Errorf("failed to start metric controller: %v", err)
+				if err != nil {
+					return ret, fmt.Errorf("failed to start metric controller: %v", err)
+				}
+
+				global.SetMeterProvider(metricController.MeterProvider())
+				ret.meterProvider = metricController.MeterProvider()
+
+				ret.disposables = append(ret.disposables, func(ctx context.Context) error { return metricController.Stop(ctx) })
 		}
+		if config.Metrics.Type == Pull {
 
-		global.SetMeterProvider(metricController.MeterProvider())
-		ret.meterProvider = metricController.MeterProvider()
+			exporter, err := prometheus.InstallNewPipeline(prometheus.Config{Registry: ret.PrometheusRegistry()})
 
-		ret.disposables = append(ret.disposables, func(ctx context.Context) error { return metricController.Stop(ctx) })
-	}
-	if config.Metrics.Type == Pull {
+			if err != nil {
+				return ret, fmt.Errorf("failed to initialize prometheus exporter %v", err)
+			}
 
-		exporter, err := prometheus.InstallNewPipeline(prometheus.Config{Registry: ret.PrometheusRegistry()})
+			http.HandleFunc("/", exporter.ServeHTTP)
 
-		if err != nil {
-			return ret, fmt.Errorf("failed to initialize prometheus exporter %v", err)
+			go func() {
+				_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
+			}()
+			global.SetMeterProvider(exporter.MeterProvider())
+			ret.meterProvider = exporter.MeterProvider()
 		}
-
-		http.HandleFunc("/", exporter.ServeHTTP)
-
-		go func() {
-			_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
-		}()
-		global.SetMeterProvider(exporter.MeterProvider())
-		ret.meterProvider = exporter.MeterProvider()
-	}
+	*/
 	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
 		return exporter.Shutdown(ctx)
 	})
@@ -178,26 +176,26 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	span := trace.SpanFromContext(ctx)
 	c, ok := cid.(string)
 
+	bag := baggage.FromContext(ctx)
+
 	if !ok {
-		// look in baggage
-		if span.IsRecording() {
-			cid := baggage.Value(ctx, attribute.Key(correlationLabel))
-			if cid.Type() != attribute.INVALID {
-				c = cid.AsString()
-			}
-		}
-		// if still empty - make one
-		if c == "" {
+		if v := bag.Member(correlationLabel).Value(); v != "" {
+			c = v
+		} else {
 			c = uuid.New().String()
 		}
 	}
 
-	ctx = context.WithValue(ctx, correlationIDHeader, c)
-
 	// save to baggage and current trace
 	cidLabel := attribute.String(correlationLabel, c)
-	ctx = baggage.ContextWithValues(ctx, cidLabel)
 	span.SetAttributes(cidLabel)
+
+	// errors ignored as we are saving a UUID and the format and content
+	// are known to be valid
+	mem, _ := baggage.NewMember(correlationLabel, c) // nolint: errcheck
+	bag, _ = bag.SetMember(mem)                      // nolint: errcheck
+
+	ctx = baggage.ContextWithBaggage(ctx, bag)
 
 	// create logger with trace and correlation id
 	fields := map[string]interface{}{
@@ -207,5 +205,4 @@ func GetRequestContext(ctx context.Context) (zerolog.Logger, context.Context) {
 	// TODO : create a logger properly
 	lgr := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, NoColor: true}).Level(zerolog.InfoLevel).With().Fields(fields).Timestamp().Logger()
 	return lgr, ctx
-
 }

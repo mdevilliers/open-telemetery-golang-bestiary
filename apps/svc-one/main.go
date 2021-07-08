@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/XSAM/otelsql"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/kelseyhightower/envconfig"
 	_ "github.com/lib/pq"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/api"
 	"github.com/mdevilliers/open-telemetery-golang-bestiary/apps/x"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"google.golang.org/grpc"
 )
 
@@ -62,7 +62,7 @@ func main() {
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)
 
 	// Register an OTel driver
-	driverName, err := otelsql.Register("postgres", semconv.DBSystemPostgres.Value.AsString())
+	driverName, err := otelsql.Register("postgres", semconv.DBSystemPostgreSQL.Value.AsString())
 	if err != nil {
 		log.Fatalf("failed to register DB driver : %v", err)
 	}

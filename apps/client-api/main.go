@@ -14,8 +14,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -66,17 +65,17 @@ func main() {
 	defer func() { _ = conn.Close() }()
 
 	client := api.NewHelloServiceClient(conn)
-
-	// Recorder metric example
-	requestLatency := metric.Must(otlp.MeterProvider().Meter("client-api-meter")).
-		NewFloat64ValueRecorder(
-			"client-api/request_latency",
-			metric.WithDescription("The latency of requests processed"),
-		).Bind(otlp.Resources().Attributes()...)
-	defer requestLatency.Unbind()
-
+	/*
+		// Recorder metric example
+		requestLatency := metric.Must(otlp.MeterProvider().Meter("client-api-meter")).
+			NewFloat64ValueRecorder(
+				"client-api/request_latency",
+				metric.WithDescription("The latency of requests processed"),
+			).Bind(otlp.Resources().Attributes()...)
+		defer requestLatency.Unbind()
+	*/
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
-		startTime := time.Now()
+		//startTime := time.Now()
 		lgr, ctx := x.GetRequestContext(req.Context())
 		lgr.Info().Msg("SayHello")
 
@@ -98,12 +97,12 @@ func main() {
 		_, _ = io.WriteString(w, fmt.Sprintf("%s\n", response))
 
 		span.End()
-		latencyMs := float64(time.Since(startTime)) / 1e6
-		requestLatency.Record(ctx, latencyMs)
+		//latencyMs := float64(time.Since(startTime)) / 1e6
+		//requestLatency.Record(ctx, latencyMs)
 	}
 
 	// wrap http handler with generic tracer
-	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello", otelhttp.WithMeterProvider(otlp.MeterProvider()))
+	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello") //, otelhttp.WithMeterProvider(otlp.MeterProvider()))
 
 	http.Handle("/hello", otelHandler)
 	log.Println("service started!")

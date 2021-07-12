@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -103,7 +103,7 @@ func main() {
 	}
 
 	// wrap http handler with generic tracer
-	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello", otelhttp.WithMeterProvider(otlp.MeterProvider()))
+	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello") //, otelhttp.WithMeterProvider(otlp.MeterProvider()))
 
 	http.Handle("/hello", otelHandler)
 	log.Println("service started!")

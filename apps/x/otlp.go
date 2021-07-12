@@ -3,6 +3,8 @@ package x
 import (
 	"context"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 
 	"github.com/google/uuid"
@@ -13,8 +15,15 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/global"
 	"go.opentelemetry.io/otel/propagation"
+	export "go.opentelemetry.io/otel/sdk/export/metric"
+	"go.opentelemetry.io/otel/sdk/metric/aggregator/histogram"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	selector "go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -114,45 +123,36 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 			return ret, fmt.Errorf("failed to start host instrumentation: %v", err)
 		}
 	}
-	/*
-		if config.Metrics.Type == Push {
-				metricController := controller.New(
-					processor.New(
-						simple.NewWithExactDistribution(), exporter,
-					),
-					controller.WithCollectPeriod(2*time.Second),
-					controller.WithExporter(exporter),
-					controller.WithResource(resources),
-				)
 
-				err = metricController.Start(ctx)
+	if config.Metrics.Type == Pull {
 
-				if err != nil {
-					return ret, fmt.Errorf("failed to start metric controller: %v", err)
-				}
-
-				global.SetMeterProvider(metricController.MeterProvider())
-				ret.meterProvider = metricController.MeterProvider()
-
-				ret.disposables = append(ret.disposables, func(ctx context.Context) error { return metricController.Stop(ctx) })
+		c := prometheus.Config{
+			Registry: ret.promregistry,
 		}
-		if config.Metrics.Type == Pull {
-
-			exporter, err := prometheus.InstallNewPipeline(prometheus.Config{Registry: ret.PrometheusRegistry()})
-
-			if err != nil {
-				return ret, fmt.Errorf("failed to initialize prometheus exporter %v", err)
-			}
-
-			http.HandleFunc("/", exporter.ServeHTTP)
-
-			go func() {
-				_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
-			}()
-			global.SetMeterProvider(exporter.MeterProvider())
-			ret.meterProvider = exporter.MeterProvider()
+		metricController := controller.New(
+			processor.New(
+				selector.NewWithHistogramDistribution(
+					histogram.WithExplicitBoundaries(c.DefaultHistogramBoundaries),
+				),
+				export.CumulativeExportKindSelector(),
+				processor.WithMemory(true),
+			),
+		)
+		exporter, err := prometheus.New(c, metricController)
+		if err != nil {
+			log.Panicf("failed to initialize prometheus exporter %v", err)
 		}
-	*/
+		global.SetMeterProvider(exporter.MeterProvider())
+
+		http.HandleFunc("/", exporter.ServeHTTP)
+
+		go func() {
+			_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
+		}()
+		global.SetMeterProvider(exporter.MeterProvider())
+		ret.meterProvider = exporter.MeterProvider()
+	}
+
 	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
 		return exporter.Shutdown(ctx)
 	})

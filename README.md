@@ -36,3 +36,11 @@ http://0.0.0.0:9411/zipkin
 
 Find your trace.
 
+Launch Prometheus 
+
+http://0.0.0.0:9090/
+
+Launch Grafana
+
+http://0.0.0.0:3000/
+

@@ -69,7 +69,7 @@ func main() {
 
 	// Recorder metric example
 	requestLatency := metric.Must(otlp.MeterProvider().Meter("client-api-meter")).
-		NewFloat64ValueRecorder(
+		NewFloat64Histogram(
 			"client-api/request_latency",
 			metric.WithDescription("The latency of requests processed"),
 		).Bind(otlp.Resources().Attributes()...)

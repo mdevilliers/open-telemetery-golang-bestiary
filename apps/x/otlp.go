@@ -35,16 +35,9 @@ type OTLPConfig struct {
 	Labels   []attribute.KeyValue
 	Metrics  Metrics
 }
-type metricsType int
-
-const (
-	Push metricsType = iota
-	Pull
-)
 
 // TODO : have sensible defaults via an option interface
 type Metrics struct {
-	Type               metricsType
 	Port               int
 	IncludeHostMetrics bool
 }
@@ -124,34 +117,31 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 		}
 	}
 
-	if config.Metrics.Type == Pull {
-
-		c := prometheus.Config{
-			Registry: ret.promregistry,
-		}
-		metricController := controller.New(
-			processor.New(
-				selector.NewWithHistogramDistribution(
-					histogram.WithExplicitBoundaries(c.DefaultHistogramBoundaries),
-				),
-				export.CumulativeExportKindSelector(),
-				processor.WithMemory(true),
-			),
-		)
-		exporter, err := prometheus.New(c, metricController)
-		if err != nil {
-			log.Panicf("failed to initialize prometheus exporter %v", err)
-		}
-		global.SetMeterProvider(exporter.MeterProvider())
-
-		http.HandleFunc("/", exporter.ServeHTTP)
-
-		go func() {
-			_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
-		}()
-		global.SetMeterProvider(exporter.MeterProvider())
-		ret.meterProvider = exporter.MeterProvider()
+	c := prometheus.Config{
+		Registry: ret.promregistry,
 	}
+	metricController := controller.New(
+		processor.NewFactory(
+			selector.NewWithHistogramDistribution(
+				histogram.WithExplicitBoundaries(c.DefaultHistogramBoundaries),
+			),
+			export.CumulativeExportKindSelector(),
+			processor.WithMemory(true),
+		),
+	)
+	promexporter, err := prometheus.New(c, metricController)
+	if err != nil {
+		log.Panicf("failed to initialize prometheus exporter %v", err)
+	}
+	global.SetMeterProvider(promexporter.MeterProvider())
+
+	http.HandleFunc("/", promexporter.ServeHTTP)
+
+	go func() {
+		_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
+	}()
+	global.SetMeterProvider(promexporter.MeterProvider())
+	ret.meterProvider = promexporter.MeterProvider()
 
 	ret.disposables = append(ret.disposables, func(ctx context.Context) error {
 		return exporter.Shutdown(ctx)

@@ -44,8 +44,8 @@ func main() {
 			semconv.ServiceVersionKey.String("1.1"),
 			semconv.ServiceNamespaceKey.String("demo")},
 		Metrics: x.Metrics{
-			Type: x.Pull,
-			Port: 2223,
+			Port:               2223,
+			IncludeHostMetrics: true,
 		},
 	})
 

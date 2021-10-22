@@ -42,7 +42,8 @@ func main() {
 		Labels: []attribute.KeyValue{
 			semconv.ServiceNameKey.String("client-api"),
 			semconv.ServiceVersionKey.String("1.1"),
-			semconv.ServiceNamespaceKey.String("demo")},
+			semconv.ServiceNamespaceKey.String("demo"),
+		},
 		Metrics: x.Metrics{
 			Port:               2223,
 			IncludeHostMetrics: true,
@@ -103,7 +104,7 @@ func main() {
 	}
 
 	// wrap http handler with generic tracer
-	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello") //, otelhttp.WithMeterProvider(otlp.MeterProvider()))
+	otelHandler := otelhttp.NewHandler(http.HandlerFunc(helloHandler), "Hello", otelhttp.WithMeterProvider(otlp.MeterProvider()))
 
 	http.Handle("/hello", otelHandler)
 	log.Println("service started!")

@@ -26,6 +26,7 @@ import (
 	selector "go.opentelemetry.io/otel/sdk/metric/selector/simple"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
@@ -71,12 +72,7 @@ func (i *instance) PrometheusRegistry() *prom.Registry {
 
 func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 
-	resources, err := resource.Merge(resource.Default(),
-		resource.NewSchemaless(config.Labels...))
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create resources: %v", err)
-	}
+	resources := resource.NewWithAttributes(semconv.SchemaURL, config.Labels...)
 
 	ret := &instance{
 		resources:    resources,
@@ -135,11 +131,14 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 	}
 	global.SetMeterProvider(promexporter.MeterProvider())
 
-	http.HandleFunc("/", promexporter.ServeHTTP)
-
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", promexporter.ServeHTTP)
 	go func() {
-		_ = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), nil)
+		if err = http.ListenAndServe(fmt.Sprintf(":%d", config.Metrics.Port), mux); err != nil {
+			log.Panicf("failed to listen start prometheus service  %v", err)
+		}
 	}()
+
 	global.SetMeterProvider(promexporter.MeterProvider())
 	ret.meterProvider = promexporter.MeterProvider()
 

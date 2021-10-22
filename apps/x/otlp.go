@@ -124,6 +124,7 @@ func InitialiseOTLP(ctx context.Context, config OTLPConfig) (*instance, error) {
 			export.CumulativeExportKindSelector(),
 			processor.WithMemory(true),
 		),
+		controller.WithResource(resources),
 	)
 	promexporter, err := prometheus.New(c, metricController)
 	if err != nil {

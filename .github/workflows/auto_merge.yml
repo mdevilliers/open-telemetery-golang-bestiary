@@ -9,7 +9,8 @@ jobs:
     if: github.actor == 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v2
+      # https://github.com/ahmadnassri/action-dependabot-auto-merge
       - uses: ahmadnassri/action-dependabot-auto-merge@v2
         with:
-          target: patch
+          target: minor
           github-token: ${{ secrets.AUTOMERGE_TOKEN }}

@@ -73,8 +73,7 @@ func main() {
 		NewFloat64Histogram(
 			"client-api/request_latency",
 			metric.WithDescription("The latency of requests processed"),
-		).Bind(otlp.Resources().Attributes()...)
-	defer requestLatency.Unbind()
+		)
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
 		startTime := time.Now()
@@ -100,7 +99,7 @@ func main() {
 
 		span.End()
 		latencyMs := float64(time.Since(startTime)) / 1e6
-		requestLatency.Record(ctx, latencyMs)
+		requestLatency.Record(ctx, latencyMs, otlp.Resources().Attributes()...)
 	}
 
 	// wrap http handler with generic tracer

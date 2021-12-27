@@ -4,7 +4,7 @@ go 1.14
 
 require (
 	cloud.google.com/go v0.78.0 // indirect
-	github.com/XSAM/otelsql v0.9.0
+	github.com/XSAM/otelsql v0.10.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0

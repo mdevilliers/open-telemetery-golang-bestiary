@@ -10,7 +10,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.4
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.12.0
 	github.com/rs/zerolog v1.26.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.28.0
 	go.opentelemetry.io/contrib/instrumentation/host v0.27.0
@@ -23,7 +23,6 @@ require (
 	go.opentelemetry.io/otel/sdk/export/metric v0.26.0
 	go.opentelemetry.io/otel/sdk/metric v0.26.0
 	go.opentelemetry.io/otel/trace v1.3.0
-	golang.org/x/oauth2 v0.0.0-20210220000619-9bb904979d93 // indirect
 	google.golang.org/genproto v0.0.0-20210303154014-9728d6b83eeb // indirect
 	google.golang.org/grpc v1.43.0
 )

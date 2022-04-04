@@ -18,10 +18,10 @@ require (
 	go.opentelemetry.io/otel v1.6.1
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.6.1
 	go.opentelemetry.io/otel/exporters/prometheus v0.27.0
-	go.opentelemetry.io/otel/metric v0.27.0
+	go.opentelemetry.io/otel/metric v0.28.0
 	go.opentelemetry.io/otel/sdk v1.6.1
-	go.opentelemetry.io/otel/sdk/export/metric v0.27.0
-	go.opentelemetry.io/otel/sdk/metric v0.27.0
+	go.opentelemetry.io/otel/sdk/export/metric v0.28.0
+	go.opentelemetry.io/otel/sdk/metric v0.28.0
 	go.opentelemetry.io/otel/trace v1.6.1
 	google.golang.org/grpc v1.45.0
 )

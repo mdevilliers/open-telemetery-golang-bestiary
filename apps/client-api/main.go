@@ -14,10 +14,10 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -56,7 +56,8 @@ func main() {
 	defer otlp.Close(ctx)
 
 	// set up GRPC client wrapping it with the Open Telemetry handlers
-	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost), grpc.WithInsecure(),
+	conn, err := grpc.Dial(fmt.Sprintf("%s:9777", config.SvcOneHost),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
 		grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
 	)
@@ -69,11 +70,8 @@ func main() {
 	client := api.NewHelloServiceClient(conn)
 
 	// Recorder metric example
-	requestLatency := metric.Must(otlp.MeterProvider().Meter("client-api-meter")).
-		NewFloat64Histogram(
-			"client-api/request_latency",
-			metric.WithDescription("The latency of requests processed"),
-		)
+	requestLatency, _ := otlp.MeterProvider().Meter("client-api-meter").
+		SyncFloat64().Histogram("client-api/request_latency")
 
 	helloHandler := func(w http.ResponseWriter, req *http.Request) {
 		startTime := time.Now()

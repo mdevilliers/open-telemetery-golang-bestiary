@@ -61,7 +61,7 @@ func main() {
 	var dsn = fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", config.DBUserName, config.DBPassword, config.DBHost, config.DBName)
 
 	// Register an OTel driver
-	driverName, err := otelsql.Register("postgres", semconv.DBSystemPostgreSQL.Value.AsString())
+	driverName, err := otelsql.Register("postgres")
 	if err != nil {
 		log.Fatalf("failed to register DB driver : %v", err)
 	}

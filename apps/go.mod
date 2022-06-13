@@ -11,7 +11,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.6
 	github.com/prometheus/client_golang v1.12.2
-	github.com/rs/zerolog v1.26.1
+	github.com/rs/zerolog v1.27.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.32.0
 	go.opentelemetry.io/contrib/instrumentation/host v0.32.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.32.0
@@ -22,5 +22,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.7.0
 	go.opentelemetry.io/otel/sdk/metric v0.30.0
 	go.opentelemetry.io/otel/trace v1.7.0
+	golang.org/x/tools v0.1.7 // indirect
 	google.golang.org/grpc v1.47.0
 )

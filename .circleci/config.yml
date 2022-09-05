@@ -2,7 +2,7 @@ version: 2
 jobs:
   build-apps:
     docker:
-      - image: circleci/golang:1.16
+      - image: circleci/golang:1.19
     steps:
       - checkout
       - run: cd apps/svc-one && go build

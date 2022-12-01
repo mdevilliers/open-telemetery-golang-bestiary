@@ -1,4 +1,4 @@
-FROM golang:1.19.2-alpine AS build
+FROM golang:1.19.3-alpine AS build
 
 ARG SVC_PATH
 

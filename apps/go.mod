@@ -11,7 +11,7 @@ require (
 	github.com/lib/pq v1.10.7
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.28.0
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.37.0
 	go.opentelemetry.io/contrib/instrumentation/host v0.37.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.36.4
 	go.opentelemetry.io/otel v1.11.2

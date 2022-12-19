@@ -3,7 +3,7 @@ module github.com/mdevilliers/open-telemetery-golang-bestiary/apps
 go 1.19
 
 require (
-	github.com/XSAM/otelsql v0.17.0
+	github.com/XSAM/otelsql v0.17.1
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0

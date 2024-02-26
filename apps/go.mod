@@ -13,14 +13,14 @@ require (
 	github.com/rs/zerolog v1.28.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.37.0
 	go.opentelemetry.io/contrib/instrumentation/host v0.37.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.37.0
-	go.opentelemetry.io/otel v1.12.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.12.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.31.0
-	go.opentelemetry.io/otel/metric v0.34.0
+	go.opentelemetry.io/otel/metric v1.24.0
 	go.opentelemetry.io/otel/sdk v1.12.0
 	go.opentelemetry.io/otel/sdk/metric v0.31.0
-	go.opentelemetry.io/otel/trace v1.12.0
+	go.opentelemetry.io/otel/trace v1.24.0
 	google.golang.org/grpc v1.56.3
 )
 
@@ -28,8 +28,8 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/felixge/httpsnoop v1.0.3 // indirect
-	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
